@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cuoricini</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --text-lg: clamp(1.125rem, 1rem + 0.75vw, 1.5rem);
+      --text-xl: clamp(1.5rem, 1.2rem + 1.25vw, 2.25rem);
+      --text-2xl: clamp(2rem, 1.2rem + 2.5vw, 3.5rem);
+      --space-2: 0.5rem;
+      --space-4: 1rem;
+      --space-6: 1.5rem;
+      --radius-full: 9999px;
+      --transition-interactive: 180ms cubic-bezier(0.16, 1, 0.3, 1);
+      --font-display: 'Playfair Display', Georgia, serif;
+    }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      font-family: var(--font-display);
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+      cursor: crosshair;
+    }
+
+    /* ── BACKGROUND ── */
+    #bg {
+      position: fixed;
+      inset: 0;
+      background-image: url('https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=1920&q=80');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      z-index: 0;
+    }
+
+    /* dark overlay for readability */
+    #bg::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        135deg,
+        oklch(0.08 0.04 10 / 0.55) 0%,
+        oklch(0.1 0.06 340 / 0.45) 100%
+      );
+    }
+
+    /* ── CANVAS (hearts layer) ── */
+    #canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* ── UI OVERLAY ── */
+    #ui {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    .title {
+      font-size: var(--text-2xl);
+      font-weight: 700;
+      color: #fff;
+      text-shadow: 0 2px 24px oklch(0.1 0.1 10 / 0.7);
+      letter-spacing: 0.01em;
+      text-align: center;
+      padding: 0 var(--space-4);
+    }
+
+    .subtitle {
+      margin-top: var(--space-2);
+      font-size: var(--text-lg);
+      font-weight: 400;
+      color: oklch(0.95 0.03 350 / 0.85);
+      text-shadow: 0 1px 12px oklch(0.1 0.1 10 / 0.6);
+      text-align: center;
+      font-style: italic;
+    }
+
+    /* ── HEART BURST (JS-created) ── */
+    .heart {
+      position: fixed;
+      pointer-events: none;
+      z-index: 3;
+      font-size: 1.5rem;
+      line-height: 1;
+      transform-origin: center bottom;
+      will-change: transform, opacity;
+      animation: heartFly var(--dur, 1.4s) cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes heartFly {
+      0%   { transform: translate(0, 0) scale(0.2) rotate(var(--rot0)); opacity: 1; }
+      15%  { transform: translate(calc(var(--dx) * 0.2), calc(var(--dy) * 0.2)) scale(1.3) rotate(var(--rot1)); opacity: 1; }
+      80%  { opacity: 0.85; }
+      100% { transform: translate(var(--dx), var(--dy)) scale(var(--scale-end)) rotate(var(--rot2)); opacity: 0; }
+    }
+
+    /* ── RIPPLE ── */
+    .ripple {
+      position: fixed;
+      pointer-events: none;
+      z-index: 2;
+      border-radius: 50%;
+      border: 2px solid oklch(0.9 0.15 350 / 0.6);
+      transform: scale(0);
+      animation: rippleOut 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes rippleOut {
+      to { transform: scale(4); opacity: 0; }
+    }
+
+    /* ── CLICK COUNTER ── */
+    #counter {
+      position: fixed;
+      bottom: var(--space-6);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 4;
+      color: oklch(0.95 0.05 350 / 0.7);
+      font-size: 0.875rem;
+      font-family: var(--font-display);
+      font-style: italic;
+      letter-spacing: 0.05em;
+      text-shadow: 0 1px 8px oklch(0.1 0.1 10 / 0.5);
+      transition: color var(--transition-interactive);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .heart, .ripple { animation: none !important; display: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="bg"></div>
+<canvas id="canvas"></canvas>
+
+<div id="ui">
+  <h1 class="title">Clicca ovunque 💗</h1>
+  <p class="subtitle">e riempi il mondo di cuoricini</p>
+</div>
+
+<div id="counter">0 cuoricini</div>
+
+<script>
+  const HEART_CHARS = ['❤️','🧡','💛','💚','💙','💜','🤍','💗','💓','💕','💖','💝','🩷','🩵','❣️'];
+  const SIZES = [20, 24, 28, 32, 38, 44];
+
+  let total = 0;
+  const counter = document.getElementById('counter');
+
+  function rand(min, max) { return min + Math.random() * (max - min); }
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  function spawnHearts(x, y, count = 14) {
+    for (let i = 0; i < count; i++) {
+      const el = document.createElement('span');
+      el.className = 'heart';
+      el.textContent = pick(HEART_CHARS);
+
+      const angle = rand(-200, 20);          // upward spread
+      const dist  = rand(60, 220);
+      const dx    = Math.sin(angle * Math.PI / 180) * dist;
+      const dy    = -Math.abs(Math.cos(angle * Math.PI / 180) * dist);
+      const size  = pick(SIZES);
+      const dur   = rand(1.1, 2.0);
+      const rot0  = rand(-40, 40);
+      const rot1  = rand(-60, 60);
+      const rot2  = rand(-120, 120);
+      const scaleEnd = rand(0.5, 1.2);
+
+      el.style.cssText = `
+        left: ${x}px;
+        top:  ${y}px;
+        font-size: ${size}px;
+        --dx: ${dx}px;
+        --dy: ${dy}px;
+        --dur: ${dur}s;
+        --rot0: ${rot0}deg;
+        --rot1: ${rot1}deg;
+        --rot2: ${rot2}deg;
+        --scale-end: ${scaleEnd};
+        margin-left: -${size / 2}px;
+        margin-top:  -${size / 2}px;
+      `;
+
+      document.body.appendChild(el);
+      el.addEventListener('animationend', () => el.remove(), { once: true });
+    }
+  }
+
+  function spawnRipple(x, y) {
+    const el = document.createElement('div');
+    el.className = 'ripple';
+    const s = 60;
+    el.style.cssText = `
+      left: ${x - s/2}px;
+      top:  ${y - s/2}px;
+      width: ${s}px;
+      height: ${s}px;
+    `;
+    document.body.appendChild(el);
+    el.addEventListener('animationend', () => el.remove(), { once: true });
+  }
+
+  function updateCounter(n) {
+    const plural = n === 1 ? 'cuoricino' : 'cuoricini';
+    counter.textContent = `${n.toLocaleString('it-IT')} ${plural}`;
+  }
+
+  document.addEventListener('click', (e) => {
+    const count = Math.floor(rand(10, 18));
+    spawnHearts(e.clientX, e.clientY, count);
+    spawnRipple(e.clientX, e.clientY);
+    total += count;
+    updateCounter(total);
+  });
+
+  // Touch support
+  document.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    Array.from(e.changedTouches).forEach(t => {
+      const count = Math.floor(rand(10, 18));
+      spawnHearts(t.clientX, t.clientY, count);
+      spawnRipple(t.clientX, t.clientY);
+      total += count;
+    });
+    updateCounter(total);
+  }, { passive: false });
+</script>
+</body>
+</html>
